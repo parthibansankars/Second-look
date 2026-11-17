@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Per-user daily usage counter for grounded checks. Counts only, never message text.
+    match /users/{uid}/usage/{day} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['groundedChecks', 'updatedAt'])
+        && request.resource.data.groundedChecks is int
+        && request.resource.data.groundedChecks <= 100;
+    }
+    // Aggregate routing counters (which tier ran each step). Write-only for clients.
+    match /routing/{day} {
+      allow read: if false;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().size() < 60;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
